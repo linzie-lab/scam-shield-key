@@ -18,7 +18,7 @@ npm install
 npm run dev
 ```
 
-Vite forwards `/api/*` requests to `http://127.0.0.1:5000`. In production, configure the web host or reverse proxy to route `/api/*` to Flask and the remaining app routes to the frontend. Do not expose Flask's development server directly to the public internet.
+Vite forwards `/api/*` requests to `http://127.0.0.1:5000`. For a single-service Render deployment, follow the root [Render deployment guide](../README.md#deploy-to-render); the Flask service serves both the API and built frontend. For other production hosts, route `/api/*` to Flask and serve the frontend build for `/`.
 
 For production hosting, configure the host to serve `index.html` for the application route `/`.
 

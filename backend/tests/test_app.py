@@ -49,11 +49,17 @@ class DetectorTests(unittest.TestCase):
 class ApiTests(unittest.TestCase):
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
-        database_path = Path(self.temp_dir.name) / "test.sqlite3"
+        temp_path = Path(self.temp_dir.name)
+        database_path = temp_path / "test.sqlite3"
+        frontend_dist = temp_path / "frontend"
+        frontend_dist.mkdir()
+        (frontend_dist / "index.html").write_text("<!doctype html><title>JuaScam</title>", encoding="utf-8")
+        (frontend_dist / "asset.svg").write_text("<svg></svg>", encoding="utf-8")
         self.app = create_app(
             {
                 "TESTING": True,
                 "DATABASE": str(database_path),
+                "FRONTEND_DIST": str(frontend_dist),
             }
         )
         self.client = self.app.test_client()
@@ -66,6 +72,27 @@ class ApiTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json()["status"], "ok")
+
+    def test_frontend_and_client_side_routes_are_served(self):
+        root_response = self.client.get("/")
+        app_route_response = self.client.get("/about")
+        asset_response = self.client.get("/asset.svg")
+
+        self.assertEqual(root_response.status_code, 200)
+        self.assertIn("JuaScam", root_response.get_data(as_text=True))
+        self.assertEqual(app_route_response.status_code, 200)
+        self.assertIn("JuaScam", app_route_response.get_data(as_text=True))
+        self.assertEqual(asset_response.status_code, 200)
+        self.assertEqual(asset_response.get_data(as_text=True), "<svg></svg>")
+        root_response.close()
+        app_route_response.close()
+        asset_response.close()
+
+    def test_unknown_api_route_does_not_serve_frontend(self):
+        response = self.client.get("/api/missing")
+
+        self.assertEqual(response.status_code, 404)
+        self.assertNotIn("JuaScam", response.get_data(as_text=True))
 
     def test_stats_and_history_work_with_an_empty_database(self):
         stats_response = self.client.get("/api/stats")

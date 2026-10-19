@@ -4,7 +4,7 @@ from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from flask import Flask, jsonify, request
+from flask import Flask, abort, jsonify, request, send_from_directory
 from flask_cors import CORS
 from werkzeug.exceptions import BadRequest, RequestEntityTooLarge, UnsupportedMediaType
 
@@ -16,6 +16,7 @@ else:
 
 MAX_CONTENT_LENGTH = 5_000
 DEFAULT_DATABASE = Path(__file__).resolve().parent / "instance" / "juascam.sqlite3"
+DEFAULT_FRONTEND_DIST = Path(__file__).resolve().parent.parent / "frontend" / "dist"
 RISK_CATEGORIES = ("low", "suspicious", "high")
 
 
@@ -67,9 +68,10 @@ def _record_scan(database_path, risk_category):
 
 
 def create_app(test_config=None):
-    app = Flask(__name__)
+    app = Flask(__name__, static_folder=None)
     app.config.from_mapping(
         DATABASE=os.environ.get("JUASCAM_DATABASE_PATH", str(DEFAULT_DATABASE)),
+        FRONTEND_DIST=os.environ.get("JUASCAM_FRONTEND_DIST", str(DEFAULT_FRONTEND_DIST)),
         MAX_CONTENT_LENGTH=64_000,
     )
     if test_config:
@@ -181,6 +183,21 @@ def create_app(test_config=None):
                 for row in rows
             ],
         )
+
+    @app.get("/", defaults={"path": ""})
+    @app.get("/<path:path>")
+    def frontend(path):
+        if path == "api" or path.startswith("api/"):
+            abort(404)
+
+        frontend_dist = Path(app.config["FRONTEND_DIST"])
+        if path and (frontend_dist / path).is_file():
+            return send_from_directory(frontend_dist, path)
+
+        if (frontend_dist / "index.html").is_file():
+            return send_from_directory(frontend_dist, "index.html")
+
+        abort(404)
 
     return app
 
